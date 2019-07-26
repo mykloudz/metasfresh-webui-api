@@ -67,10 +67,10 @@ final class PackageableViewFilters
 
 		final DocumentFilterParamDescriptor.Builder deliveryDateParameter = newParamDescriptor(PackageableViewFilterVO.PARAM_DeliveryDate)
 				.setDisplayName(Services.get(IMsgBL.class).translatable(PackageableViewFilterVO.PARAM_DeliveryDate))
-				.setWidgetType(DocumentFieldWidgetType.Date);
+				.setWidgetType(DocumentFieldWidgetType.LocalDate);
 
 		final DocumentFilterParamDescriptor.Builder preparationDateParameter = newParamDescriptor(PackageableViewFilterVO.PARAM_PreparationDate)
-				.setWidgetType(DocumentFieldWidgetType.Date);
+				.setWidgetType(DocumentFieldWidgetType.LocalDate);
 
 		return DocumentFilterDescriptor.builder()
 				.setFrequentUsed(true)
@@ -106,8 +106,8 @@ final class PackageableViewFilters
 				.salesOrderId(filter.getParameterValueAsRepoIdOrNull(PackageableViewFilterVO.PARAM_C_Order_ID, OrderId::ofRepoIdOrNull))
 				.customerId(filter.getParameterValueAsRepoIdOrNull(PackageableViewFilterVO.PARAM_Customer_ID, BPartnerId::ofRepoIdOrNull))
 				.warehouseTypeId(filter.getParameterValueAsRepoIdOrNull(PackageableViewFilterVO.PARAM_M_Warehouse_Type_ID, WarehouseTypeId::ofRepoIdOrNull))
-				.deliveryDate(filter.getParameterValueAsLocalDate(PackageableViewFilterVO.PARAM_DeliveryDate))
-				.preparationDate(filter.getParameterValueAsLocalDate(PackageableViewFilterVO.PARAM_PreparationDate))
+				.deliveryDate(filter.getParameterValueAsLocalDateOrNull(PackageableViewFilterVO.PARAM_DeliveryDate))
+				.preparationDate(filter.getParameterValueAsLocalDateOrNull(PackageableViewFilterVO.PARAM_PreparationDate))
 				.build();
 	}
 

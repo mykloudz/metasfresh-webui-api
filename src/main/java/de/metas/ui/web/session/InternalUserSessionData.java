@@ -6,7 +6,6 @@ import java.util.Locale;
 import java.util.Properties;
 
 import org.adempiere.service.ClientId;
-import org.adempiere.service.OrgId;
 import org.compiere.util.Env;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
@@ -20,6 +19,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import com.google.common.base.MoreObjects;
 
 import de.metas.i18n.Language;
+import de.metas.organization.OrgId;
 import de.metas.security.RoleId;
 import de.metas.ui.web.base.session.UserPreference;
 import de.metas.user.UserId;
@@ -34,12 +34,12 @@ import de.metas.user.UserId;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 2 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public
  * License along with this program. If not, see
  * <http://www.gnu.org/licenses/gpl-2.0.html>.
@@ -48,11 +48,10 @@ import de.metas.user.UserId;
 
 /**
  * Internal {@link UserSession} data.
- * 
+ * <p>
  * NOTE: it's here and not inside UserSession class because it seems spring could not discover it
- * 
- * @author metas-dev <dev@metasfresh.com>
  *
+ * @author metas-dev <dev@metasfresh.com>
  */
 @Component
 @Primary
@@ -252,14 +251,14 @@ import de.metas.user.UserId;
 
 		//
 		// Check the language (and update it if needed)
-		Env.verifyLanguage(lang);
+		final Language validLang = Env.verifyLanguageFallbackToBase(lang);
 
 		//
 		// Actual update
-		final String adLanguageNew = lang.getAD_Language();
+		final String adLanguageNew = validLang.getAD_Language();
 		Env.setContext(ctx, Env.CTXNAME_AD_Language, adLanguageNew);
-		this.locale = lang.getLocale();
-		UserSession.logger.info("Changed AD_Language: {} -> {}, {}", adLanguageOld, adLanguageNew, lang);
+		this.locale = validLang.getLocale();
+		UserSession.logger.info("Changed AD_Language: {} -> {}, {}", adLanguageOld, adLanguageNew, validLang);
 
 		return adLanguageOld;
 	}

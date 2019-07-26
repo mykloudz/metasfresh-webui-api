@@ -30,6 +30,8 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
@@ -67,6 +69,8 @@ import de.metas.ui.web.websocket.WebsocketSender;
 import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.WindowId;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.model.DocumentCollection;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFactory;
 import de.metas.user.UserId;
@@ -134,6 +138,15 @@ public class DebugRestController
 	@Autowired
 	@Lazy
 	private WebsocketSender websocketSender;
+
+	@Autowired
+	@Lazy
+	private ObjectMapper sharedJsonObjectMapper;
+
+	private JSONOptions newJSONOptions()
+	{
+		return JSONOptions.of(userSession);
+	}
 
 	@ApiResponses(value = { @ApiResponse(code = 200, message = "cache reset done") })
 	@RequestMapping(value = "/cacheReset", method = RequestMethod.GET)
@@ -210,12 +223,12 @@ public class DebugRestController
 	{
 		userSession.assertLoggedIn();
 
-		final String adLanguage = userSession.getAD_Language();
+		final JSONOptions jsonOpts = newJSONOptions();
 
 		return viewsRepo.getViews()
 				.stream()
 				.map(ViewResult::ofView)
-				.map(viewResult -> JSONViewResult.of(viewResult, ViewRowOverridesHelper.NULL, adLanguage))
+				.map(viewResult -> JSONViewResult.of(viewResult, ViewRowOverridesHelper.NULL, jsonOpts))
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
@@ -362,7 +375,7 @@ public class DebugRestController
 		return loggerInfos;
 	}
 
-	public static enum LoggingModule
+	public enum LoggingModule
 	{
 		websockets(de.metas.ui.web.websocket.WebSocketConfig.class.getPackage().getName()), view(de.metas.ui.web.view.IView.class.getPackage().getName()), cache(
 				de.metas.cache.CCache.class.getName() //
@@ -508,5 +521,23 @@ public class DebugRestController
 		sendWebsocketViewChangedNotification(viewId, rowIds);
 
 		return "Deleted " + countDeleted + " rows";
+	}
+
+	@GetMapping("/legacyDateTimeWidgets")
+	public String setEnableLegacyDateTimeWidgets(@RequestParam("enable") final boolean enable)
+	{
+		DateTimeConverters.setEnableLegacyDateTimeWidgets(enable);
+
+		return DateTimeConverters.getConfig().toString();
+	}
+
+	@GetMapping("/changeJsonEngineCofiguration")
+	public void changeJsonEngineConfiguration(
+			@RequestParam(value = "failOnUnknownProperties", required = false) final Boolean failOnUnknownProperties)
+	{
+		if (failOnUnknownProperties != null)
+		{
+			sharedJsonObjectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, failOnUnknownProperties);
+		}
 	}
 }

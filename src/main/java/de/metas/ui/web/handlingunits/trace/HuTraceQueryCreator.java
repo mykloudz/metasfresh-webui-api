@@ -1,7 +1,7 @@
 package de.metas.ui.web.handlingunits.trace;
 
+import java.time.Instant;
 import java.util.Collection;
-import java.util.Date;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.function.BiFunction;
@@ -9,7 +9,6 @@ import java.util.function.BiFunction;
 import javax.annotation.Nullable;
 
 import org.adempiere.exceptions.AdempiereException;
-import org.adempiere.service.OrgId;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -22,6 +21,7 @@ import de.metas.handlingunits.trace.HUTraceEventQuery.EventTimeOperator;
 import de.metas.handlingunits.trace.HUTraceEventQuery.RecursionMode;
 import de.metas.handlingunits.trace.HUTraceType;
 import de.metas.inoutcandidate.api.ShipmentScheduleId;
+import de.metas.organization.OrgId;
 import de.metas.product.ProductId;
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilterParam;
@@ -140,16 +140,16 @@ public class HuTraceQueryCreator
 		switch (parameter.getOperator())
 		{
 			case EQUAL:
-				final Date value = (Date)parameter.getValue();
+				final Instant value = parameter.getValueAsInstant();
 				return query
 						.withEventTimeOperator(EventTimeOperator.EQUAL)
-						.withEventTime(value.toInstant());
+						.withEventTime(value);
 			case BETWEEN:
-				final Date valueFrom = (Date)parameter.getValue();
-				final Date valueTo = (Date)parameter.getValueTo();
+				final Instant valueFrom = parameter.getValueAsInstant();
+				final Instant valueTo = parameter.getValueToAsInstant();
 				return query
 						.withEventTimeOperator(EventTimeOperator.BETWEEN)
-						.withEventTime(valueFrom.toInstant()).withEventTimeTo(valueTo.toInstant());
+						.withEventTime(valueFrom).withEventTimeTo(valueTo);
 			default:
 				throw new AdempiereException("Unexpected operator=" + parameter.getOperator() + " in parameter")
 						.appendParametersToMessage()

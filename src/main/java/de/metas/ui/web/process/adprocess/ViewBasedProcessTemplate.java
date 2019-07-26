@@ -4,7 +4,7 @@ import java.util.stream.Stream;
 
 import javax.annotation.OverridingMethodsMustInvokeSuper;
 
-import org.compiere.Adempiere;
+import org.compiere.SpringContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import de.metas.process.ClientOnlyProcess;
@@ -24,6 +24,7 @@ import de.metas.ui.web.view.ViewRowIdsSelection;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.WindowId;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.util.Check;
 import lombok.NonNull;
 
@@ -93,10 +94,12 @@ public abstract class ViewBasedProcessTemplate extends JavaProcess
 	private ViewRowIdsSelection _viewRowIdsSelection;
 	private ViewRowIdsSelection _parentViewRowIdsSelection;
 	private ViewRowIdsSelection _childViewRowIdsSelection;
+	
+	private transient JSONOptions _jsonOptions; // lazy
 
 	protected ViewBasedProcessTemplate()
 	{
-		Adempiere.autowire(this);
+		SpringContextHolder.instance.autowire(this);
 	}
 
 	/**
@@ -275,4 +278,13 @@ public abstract class ViewBasedProcessTemplate extends JavaProcess
 		return getChildView(IView.class).getById(rowId);
 	}
 
+	protected final JSONOptions getJSONOptions()
+	{
+		JSONOptions jsonOptions = this._jsonOptions;
+		if (jsonOptions == null)
+		{
+			jsonOptions = this._jsonOptions = JSONOptions.newInstance();
+		}
+		return jsonOptions;
+	}
 }

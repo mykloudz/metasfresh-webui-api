@@ -4,6 +4,8 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import javax.annotation.Nullable;
+
 import org.adempiere.ad.callout.api.ICalloutField;
 import org.adempiere.ad.element.api.AdTabId;
 import org.adempiere.ad.element.api.AdWindowId;
@@ -20,10 +22,12 @@ import org.compiere.model.I_AD_Form;
 import org.compiere.model.I_AD_Process;
 import org.compiere.model.I_AD_Process_Para;
 import org.compiere.model.X_AD_Process;
-import org.compiere.util.Util;
+import org.compiere.util.TimeUtil;
+import org.slf4j.Logger;
 
 import de.metas.cache.CCache;
 import de.metas.i18n.IModelTranslationMap;
+import de.metas.logging.LogManager;
 import de.metas.process.IADProcessDAO;
 import de.metas.process.IProcessPreconditionsContext;
 import de.metas.process.JavaProcess;
@@ -57,10 +61,9 @@ import de.metas.ui.web.window.descriptor.sql.SqlLookupDescriptor;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
+import de.metas.util.lang.CoalesceUtil;
 import lombok.Builder;
 import lombok.NonNull;
-
-import javax.annotation.Nullable;
 
 /*
  * #%L
@@ -93,7 +96,7 @@ import javax.annotation.Nullable;
 /* package */ class ADProcessDescriptorsFactory
 {
 	// services
-	// private static final transient Logger logger = LogManager.getLogger(ProcessDescriptorsFactory.class);
+	private static final transient Logger logger = LogManager.getLogger(ADProcessDescriptorsFactory.class);
 	private final transient IExpressionFactory expressionFactory = Services.get(IExpressionFactory.class);
 	private final transient DefaultValueExpressionsFactory defaultValueExpressions = DefaultValueExpressionsFactory.newInstance();
 	private final transient IADTableDAO adTableDAO = Services.get(IADTableDAO.class);
@@ -122,12 +125,30 @@ import javax.annotation.Nullable;
 					.collect(GuavaCollectors.distinctBy(RelatedProcessDescriptor::getProcessId));
 		}
 
-		final DisplayPlace displayPlace = preconditionsContext.getDisplayPlace();
-
 		return relatedProcessDescriptors
-				.filter(relatedProcess -> displayPlace == null || relatedProcess.isDisplayedOn(displayPlace))
-				.filter(relatedProcess -> relatedProcess.isExecutionGranted(userRolePermissions)) // only those which can be executed by current user permissions
+				.filter(relatedProcess -> isEligible(relatedProcess, preconditionsContext, userRolePermissions))
 				.map(relatedProcess -> toWebuiRelatedProcessDescriptor(relatedProcess, preconditionsContext));
+	}
+
+	private boolean isEligible(
+			@NonNull final RelatedProcessDescriptor relatedProcess,
+			@NonNull final WebuiPreconditionsContext preconditionsContext,
+			@NonNull final IUserRolePermissions userRolePermissions)
+	{
+		final DisplayPlace displayPlace = preconditionsContext.getDisplayPlace();
+		if (displayPlace != null && !relatedProcess.isDisplayedOn(displayPlace))
+		{
+			logger.trace("Process not eligible because displayPlace not matching: {}, {}", relatedProcess, displayPlace);
+			return false;
+		}
+
+		if (!relatedProcess.isExecutionGranted(userRolePermissions))
+		{
+			logger.trace("Process not eligible because execution not granted: {}, {}", relatedProcess, userRolePermissions);
+			return false;
+		}
+
+		return true;
 	}
 
 	private WebuiRelatedProcessDescriptor toWebuiRelatedProcessDescriptor(
@@ -227,7 +248,7 @@ import javax.annotation.Nullable;
 			final String showHelpParam,
 			final boolean hasProcessParameters)
 	{
-		final String showHelp = Util.coalesce(showHelpParam, X_AD_Process.SHOWHELP_DonTShowHelp);
+		final String showHelp = CoalesceUtil.coalesce(showHelpParam, X_AD_Process.SHOWHELP_DonTShowHelp);
 
 		if (X_AD_Process.SHOWHELP_ShowHelp.equals(showHelp))
 		{
@@ -346,12 +367,16 @@ import javax.annotation.Nullable;
 		}
 	}
 
-	private static DocumentFieldWidgetType extractWidgetType(final String parameterName, final int adReferenceId, final Optional<LookupDescriptor> lookupDescriptor, final boolean isRange)
+	private static DocumentFieldWidgetType extractWidgetType(
+			final String parameterName,
+			final int adReferenceId,
+			final Optional<LookupDescriptor> lookupDescriptor,
+			final boolean isRange)
 	{
 		final DocumentFieldWidgetType widgetType = DescriptorsFactoryHelper.extractWidgetType(parameterName, adReferenceId, lookupDescriptor);
 
 		// Date range:
-		if (isRange && widgetType == DocumentFieldWidgetType.Date)
+		if (isRange && widgetType == DocumentFieldWidgetType.LocalDate)
 		{
 			return DocumentFieldWidgetType.DateRange;
 		}
@@ -382,7 +407,8 @@ import javax.annotation.Nullable;
 		}
 	}
 
-	@Nullable private static String extractClassnameOrNull(final I_AD_Process adProcess)
+	@Nullable
+	private static String extractClassnameOrNull(final I_AD_Process adProcess)
 	{
 		//
 		// First try: Check process classname
@@ -448,7 +474,10 @@ import javax.annotation.Nullable;
 			else if (fieldValue instanceof DateRangeValue)
 			{
 				final DateRangeValue dateRange = (DateRangeValue)fieldValue;
-				return ProcessParams.of(parameterName, dateRange.getFrom(), dateRange.getTo());
+				return ProcessParams.of(
+						parameterName,
+						TimeUtil.asDate(dateRange.getFrom()),
+						TimeUtil.asDate(dateRange.getTo()));
 			}
 			else
 			{

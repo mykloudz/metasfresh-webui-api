@@ -1,11 +1,10 @@
 package de.metas.ui.web.document.filter;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -16,8 +15,7 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.ui.web.window.datatypes.LookupValue;
-import de.metas.ui.web.window.datatypes.json.JSONDate;
-import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.util.Check;
 import de.metas.util.lang.RepoIdAware;
 import lombok.EqualsAndHashCode;
@@ -48,7 +46,7 @@ import lombok.NonNull;
 @EqualsAndHashCode // required for (ETag) caching
 public class DocumentFilterParam
 {
-	public static enum Operator
+	public enum Operator
 	{
 		EQUAL, NOT_EQUAL, //
 		IN_ARRAY, //
@@ -206,14 +204,24 @@ public class DocumentFilterParam
 		return DisplayType.toBoolean(value, defaultValue);
 	}
 
-	public Date getValueAsDate(final Date defaultValue)
+	public LocalDate getValueAsLocalDateOr(final LocalDate defaultValue)
 	{
-		if (value == null)
-		{
-			return defaultValue;
-		}
+		return value != null ? DateTimeConverters.fromObjectToLocalDate(value) : defaultValue;
+	}
 
-		return JSONDate.fromObject(value, DocumentFieldWidgetType.Date);
+	public LocalDate getValueToAsLocalDateOr(final LocalDate defaultValue)
+	{
+		return valueTo != null ? DateTimeConverters.fromObjectToLocalDate(valueTo) : defaultValue;
+	}
+
+	public Instant getValueAsInstant()
+	{
+		return value != null ? DateTimeConverters.fromObjectToInstant(value) : null;
+	}
+
+	public Instant getValueToAsInstant()
+	{
+		return valueTo != null ? DateTimeConverters.fromObjectToInstant(valueTo) : null;
 	}
 
 	public Collection<?> getValueAsCollection()
@@ -287,15 +295,9 @@ public class DocumentFilterParam
 		return repoIdMapper.apply(idInt);
 	}
 
-	public LocalDateTime getValueAsLocalDateTime()
-	{
-		return JSONDate.localDateTimeFromObject(value);
-	}
-
 	public LocalDate getValueAsLocalDate()
 	{
-		final LocalDateTime valueDateTime = getValueAsLocalDateTime();
-		return valueDateTime != null ? valueDateTime.toLocalDate() : null;
+		return DateTimeConverters.fromObjectToLocalDate(value);
 	}
 
 	public Object getValueTo()

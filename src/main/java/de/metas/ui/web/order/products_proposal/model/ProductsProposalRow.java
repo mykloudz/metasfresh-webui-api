@@ -8,13 +8,15 @@ import java.util.Objects;
 import javax.annotation.Nullable;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 import de.metas.pricing.ProductPriceId;
 import de.metas.product.ProductId;
 import de.metas.ui.web.order.products_proposal.filters.ProductsProposalViewFilter;
 import de.metas.ui.web.view.IViewRow;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValues;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValuesHolder;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn;
-import de.metas.ui.web.view.descriptor.annotation.ViewColumnHelper;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.LookupValue;
@@ -48,7 +50,7 @@ import lombok.ToString;
  * #L%
  */
 
-@ToString(exclude = { "_jsonValuesByFieldName", "_renderModeByFieldName" })
+@ToString(exclude = { "values" })
 public class ProductsProposalRow implements IViewRow
 {
 	public static final ProductsProposalRow cast(final IViewRow row)
@@ -76,7 +78,7 @@ public class ProductsProposalRow implements IViewRow
 
 	public static final String FIELD_Currency = "currency";
 	@ViewColumn(seqNo = 50, fieldName = FIELD_Currency, captionKey = "C_Currency_ID", widgetType = DocumentFieldWidgetType.Text)
-	private final String currencyCode;
+	private final String currencyCodeStr;
 
 	public static final String FIELD_Qty = "qty";
 	@ViewColumn(seqNo = 60, fieldName = FIELD_Qty, captionKey = "Qty", widgetType = DocumentFieldWidgetType.Quantity, editor = ViewEditorRenderMode.ALWAYS)
@@ -93,7 +95,7 @@ public class ProductsProposalRow implements IViewRow
 	private final LookupValue bpartner;
 
 	public static final String FIELD_LastSalesInvoiceDate = "lastSalesInvoiceDate";
-	@ViewColumn(displayed = false, fieldName = FIELD_LastSalesInvoiceDate, captionKey = "LastSalesInvoiceDate", widgetType = DocumentFieldWidgetType.Date)
+	@ViewColumn(displayed = false, fieldName = FIELD_LastSalesInvoiceDate, captionKey = "LastSalesInvoiceDate", widgetType = DocumentFieldWidgetType.LocalDate)
 	@Getter
 	private final LocalDate lastSalesInvoiceDate;
 
@@ -105,8 +107,11 @@ public class ProductsProposalRow implements IViewRow
 	@Getter
 	private final ProductProposalPrice price;
 
-	private ImmutableMap<String, Object> _jsonValuesByFieldName; // lazy
-	private ImmutableMap<String, ViewEditorRenderMode> _renderModeByFieldName; // lazy
+	private final ViewRowFieldNameAndJsonValuesHolder<ProductsProposalRow> values;
+	private static final ImmutableMap<String, ViewEditorRenderMode> EDITOR_RENDER_MODES = ImmutableMap.<String, ViewEditorRenderMode> builder()
+			.put(FIELD_Qty, ViewEditorRenderMode.ALWAYS)
+			.put(FIELD_Price, ViewEditorRenderMode.ALWAYS)
+			.build();
 
 	@Builder(toBuilder = true)
 	private ProductsProposalRow(
@@ -130,8 +135,8 @@ public class ProductsProposalRow implements IViewRow
 
 		this.price = price;
 		this.isCampaignPrice = price.isCampaignPriceUsed();
-		this.userEnteredPrice = price.getUserEnteredPrice().getValue();
-		this.currencyCode = price.getCurrencyCode();
+		this.userEnteredPrice = price.getUserEnteredPrice().getAsBigDecimal();
+		this.currencyCodeStr = price.getCurrencyCode().toThreeLetterCode();
 
 		this.qty = qty;
 
@@ -140,38 +145,28 @@ public class ProductsProposalRow implements IViewRow
 
 		this.productPriceId = productPriceId;
 		this.copiedFromProductPriceId = copiedFromProductPriceId;
+
+		this.values = ViewRowFieldNameAndJsonValuesHolder.builder(ProductsProposalRow.class)
+				.viewEditorRenderModeByFieldName(EDITOR_RENDER_MODES)
+				.build();
 	}
 
 	@Override
-	public Map<String, Object> getFieldNameAndJsonValues()
+	public ImmutableSet<String> getFieldNames()
 	{
-		ImmutableMap<String, Object> jsonValuesByFieldName = _jsonValuesByFieldName;
-		if (jsonValuesByFieldName == null)
-		{
-			jsonValuesByFieldName = _jsonValuesByFieldName = ViewColumnHelper.extractJsonMap(this);
-		}
-		return jsonValuesByFieldName;
+		return values.getFieldNames();
+	}
+
+	@Override
+	public ViewRowFieldNameAndJsonValues getFieldNameAndJsonValues()
+	{
+		return values.get(this);
 	}
 
 	@Override
 	public Map<String, ViewEditorRenderMode> getViewEditorRenderModeByFieldName()
 	{
-		ImmutableMap<String, ViewEditorRenderMode> renderModeByFieldName = _renderModeByFieldName;
-		if (renderModeByFieldName == null)
-		{
-			renderModeByFieldName = _renderModeByFieldName = buildViewEditorRenderModeByFieldName();
-		}
-		return renderModeByFieldName;
-	}
-
-	private ImmutableMap<String, ViewEditorRenderMode> buildViewEditorRenderModeByFieldName()
-	{
-		final ImmutableMap.Builder<String, ViewEditorRenderMode> builder = ImmutableMap.builder();
-
-		builder.put(FIELD_Qty, ViewEditorRenderMode.ALWAYS);
-		builder.put(FIELD_Price, ViewEditorRenderMode.ALWAYS);
-
-		return builder.build();
+		return values.getViewEditorRenderModeByFieldName();
 	}
 
 	public boolean isPriceEditable()

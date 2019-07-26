@@ -12,7 +12,7 @@ import javax.annotation.Nullable;
 import org.adempiere.ad.element.api.AdTabId;
 import org.adempiere.ad.expression.api.ILogicExpression;
 import org.adempiere.model.InterfaceWrapperHelper;
-import org.compiere.Adempiere;
+import org.compiere.SpringContextHolder;
 import org.compiere.model.GridTabVO;
 import org.compiere.model.GridWindowVO;
 import org.compiere.model.I_AD_UI_Column;
@@ -21,7 +21,6 @@ import org.compiere.model.I_AD_UI_ElementField;
 import org.compiere.model.I_AD_UI_ElementGroup;
 import org.compiere.model.I_AD_UI_Section;
 import org.compiere.model.X_AD_UI_Element;
-import org.compiere.util.Util;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -133,7 +132,7 @@ public class LayoutFactory
 			@NonNull final GridTabVO gridTabVO,
 			@Nullable final GridTabVO parentTab)
 	{
-		Adempiere.autowire(this);
+		SpringContextHolder.instance.autowire(this);
 
 		_adWindowId = gridTabVO.getAD_Window_ID();
 		windowCaption = TranslatableStrings.ofMap(gridWindowVO.getNameTrls(), gridWindowVO.getName());
@@ -508,7 +507,7 @@ public class LayoutFactory
 	{
 		final List<DocumentFieldDescriptor.Builder> fields = new ArrayList<>();
 
-		final String uiElementType = Util.coalesce(uiElement.getAD_UI_ElementType(), X_AD_UI_Element.AD_UI_ELEMENTTYPE_Field);
+		final String uiElementType = CoalesceUtil.coalesce(uiElement.getAD_UI_ElementType(), X_AD_UI_Element.AD_UI_ELEMENTTYPE_Field);
 		if (X_AD_UI_Element.AD_UI_ELEMENTTYPE_Field.equals(uiElementType))
 		{
 			// add the "primary" field
