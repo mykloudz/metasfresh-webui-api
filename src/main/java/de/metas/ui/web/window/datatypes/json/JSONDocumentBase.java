@@ -205,6 +205,16 @@ public abstract class JSONDocumentBase
 
 	protected final void setFields(final Map<String, JSONDocumentField> fieldsByName)
 	{
+		//Purchase Requisition Window : Setting short closed line item fields as readonly 
+		JSONDocumentField shortClosedField = fieldsByName.get("IsShortClosed") != null ? fieldsByName.get("IsShortClosed") : null;
+		    if(shortClosedField != null){
+		      if(shortClosedField.getValue().equals(true)){
+			  Set<String> set = fieldsByName.keySet();
+			  for(String fields : set){
+			    fieldsByName.get(fields).setReadonly(true, null);
+			  }
+		      }
+		    }
 		this.fieldsByName = fieldsByName;
 
 		if (unboxPasswordFields && fieldsByName != null && !fieldsByName.isEmpty())
