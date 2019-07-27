@@ -3,6 +3,7 @@ package de.metas.ui.web.window.datatypes.json;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -205,6 +206,15 @@ public abstract class JSONDocumentBase
 
 	protected final void setFields(final Map<String, JSONDocumentField> fieldsByName)
 	{
+		JSONDocumentField shortClosedField = fieldsByName.get("IsShortClosed") != null ? fieldsByName.get("IsShortClosed") : null;
+	    if(shortClosedField != null){
+	      if(shortClosedField.getValue().equals(true)){
+	          Set<String> set = fieldsByName.keySet();
+	          for(String fields : set){
+	            fieldsByName.get(fields).setReadonly(true, null);
+	          }
+	      }
+	    }
 		this.fieldsByName = fieldsByName;
 
 		if (unboxPasswordFields && fieldsByName != null && !fieldsByName.isEmpty())
