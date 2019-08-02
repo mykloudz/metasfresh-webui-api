@@ -206,7 +206,7 @@ public abstract class JSONDocumentBase
 
 	protected final void setFields(final Map<String, JSONDocumentField> fieldsByName)
 	{
-		JSONDocumentField shortClosedField = fieldsByName.get("IsShortClosed") != null ? fieldsByName.get("IsShortClosed") : null;
+		JSONDocumentField shortClosedField = fieldsByName.get("isshortclosed") != null ? fieldsByName.get("isshortclosed") : null;
 	    if(shortClosedField != null){
 	      if(shortClosedField.getValue().equals(true)){
 	          Set<String> set = fieldsByName.keySet();
