@@ -2,6 +2,7 @@ package de.metas.ui.web.handlingunits;
 
 import static org.adempiere.model.InterfaceWrapperHelper.loadOutOfTrx;
 
+import java.lang.reflect.Field;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -23,6 +24,7 @@ import org.adempiere.exceptions.DBException;
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.model.PlainContextAware;
 import org.compiere.model.I_C_UOM;
+import org.compiere.model.I_M_Attribute;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.slf4j.Logger;
@@ -36,6 +38,8 @@ import de.metas.handlingunits.IHUQueryBuilder;
 import de.metas.handlingunits.IHUStatusBL;
 import de.metas.handlingunits.IHandlingUnitsBL;
 import de.metas.handlingunits.IHandlingUnitsDAO;
+import de.metas.handlingunits.attribute.IAttributeValue;
+import de.metas.handlingunits.attribute.storage.IAttributeStorage;
 import de.metas.handlingunits.exceptions.HUException;
 import de.metas.handlingunits.model.I_M_HU;
 import de.metas.handlingunits.model.I_M_Locator;
@@ -319,11 +323,129 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 		}
 
 		final HUEditorRow huEditorRowBuilt = huEditorRow.build();
+		
+		//*****************************************************************************************************
+			String bhg_attribute = "";
+			try {
+				HUEditorRowAttributes rows = huEditorRowBuilt.getAttributes();
+				Field field = HUEditorRowAttributes.class.getDeclaredField("attributesStorage");
+				field.setAccessible(true);
+				IAttributeStorage attributesStorage = (IAttributeStorage) field.get(rows);
+				List<IAttributeValue> extendedClass = attributesStorage.getAttributeValues();
+				for(IAttributeValue val : extendedClass){
+					I_M_Attribute m_attribute = val.getM_Attribute();
+					if(m_attribute.getName().equalsIgnoreCase("Width")){
+						bhg_attribute = val.getValue().toString();
+						bhg_attribute = bhg_attribute != "0" ? String.valueOf(bhg_attribute).split("\\.")[0] : "0";
+					}
+					if(m_attribute.getName().equalsIgnoreCase("Height")){
+						String bhg_attribute1 = val.getValue().toString();
+						bhg_attribute1 = bhg_attribute1 != "0" ? String.valueOf(bhg_attribute1).split("\\.")[0] : "0";
+						bhg_attribute = bhg_attribute.concat("_").concat(bhg_attribute1);
+						
+					}
+					if(m_attribute.getName().equalsIgnoreCase("Nos/Sets")){
+						String bhg_attribute1 = val.getValue().toString();
+						bhg_attribute1 = bhg_attribute1 != "0" ? String.valueOf(bhg_attribute1).split("\\.")[0] : "0";
+						bhg_attribute = bhg_attribute.concat("_").concat(bhg_attribute1);
+					}
+				}
+				
+			} catch (NoSuchFieldException | SecurityException | IllegalArgumentException |IllegalAccessException e) {
+				e.printStackTrace();
+				e.getCause();
+			}
+			
+		//*****************************************************************************************************
 
 		// stopwatch.stop();
 		// System.out.println("createHUEditorRow: created " + huEditorRowBuilt + " in " + stopwatch);
+			final String attribute = (bhg_attribute.equals("0_0_0")) || (bhg_attribute.equals("")) ? "" : bhg_attribute;
+			final HUEditorRow.Builder huEditorRow1 = HUEditorRow.builder(windowId)
+					.setRowId(rowId)
+					.setType(huRecordType)
+					.setTopLevel(topLevelHUId == null)
+					.setProcessed(processed)
+					.setBPartnerId(BPartnerId.ofRepoIdOrNull(hu.getC_BPartner_ID()))
+					.setAttributesProvider(attributesProvider)
+					//
+					.setCode(hu.getValue())
+					.setHUUnitType(huUnitTypeLookupValue)
+					.setHUStatusDisplay(huStatusDisplay)
+					.setHUStatus(hu.getHUStatus())
+					.setReservedForOrderLine(orderLineIdWithReservation.orElse(null))
+					//.setBHG_Attributes(attribute)
+					//.setPackingInfo(extractPackingInfo(hu, huRecordType));
+					.setPackingInfo(attribute);
 
-		return huEditorRowBuilt;
+			//
+			// Acquire Best Before Date if required
+			if (showBestBeforeDate)
+			{
+				huEditorRow1.setBestBeforeDate(extractBestBeforeDate(attributesProvider, rowId));
+			}
+
+			//
+			// Locator
+
+			huEditorRow1.setLocator(createLocatorLookupValue(hu.getM_Locator_ID()));
+
+			//
+			// Product/UOM/Qty if there is only one product stored
+			final IHUProductStorage singleProductStorage1 = getSingleProductStorage(hu);
+			if (singleProductStorage1 != null)
+			{
+				huEditorRow1
+						.setProduct(createProductLookupValue(singleProductStorage1.getProductId()))
+						.setUOM(createUOMLookupValue(singleProductStorage1.getC_UOM()))
+						.setQtyCU(singleProductStorage1.getQty().getAsBigDecimal());
+			}
+
+			//
+			// Included HUs
+			final HuId topLevelHUIdEffective1 = topLevelHUId != null ? topLevelHUId : huId;
+			if (aggregatedTU)
+			{
+				final IHUStorageFactory storageFactory = handlingUnitsBL.getStorageFactory();
+				storageFactory
+						.getStorage(hu)
+						.getProductStorages()
+						.stream()
+						.map(huStorage -> createHUEditorRow(huId, topLevelHUIdEffective1, huStorage, processed))
+						.forEach(huEditorRow1::addIncludedRow);
+
+			}
+			else if (X_M_HU_PI_Version.HU_UNITTYPE_LoadLogistiqueUnit.equals(huUnitTypeCode))
+			{
+				final IHandlingUnitsDAO handlingUnitsDAO = Services.get(IHandlingUnitsDAO.class);
+				handlingUnitsDAO.retrieveIncludedHUs(hu)
+						.stream()
+						.map(includedHU -> createHUEditorRow(includedHU, topLevelHUIdEffective1))
+						.forEach(huEditorRow1::addIncludedRow);
+			}
+			else if (X_M_HU_PI_Version.HU_UNITTYPE_TransportUnit.equals(huUnitTypeCode))
+			{
+				final IHandlingUnitsDAO handlingUnitsDAO = Services.get(IHandlingUnitsDAO.class);
+				final IHUStorageFactory storageFactory = handlingUnitsBL.getStorageFactory();
+				handlingUnitsDAO.retrieveIncludedHUs(hu)
+						.stream()
+						.map(includedVHU -> storageFactory.getStorage(includedVHU))
+						.flatMap(vhuStorage -> vhuStorage.getProductStorages().stream())
+						.map(vhuProductStorage -> createHUEditorRow(huId, topLevelHUIdEffective1, vhuProductStorage, processed))
+						.forEach(huEditorRow1::addIncludedRow);
+			}
+			else if (X_M_HU_PI_Version.HU_UNITTYPE_VirtualPI.equals(huUnitTypeCode))
+			{
+				// do nothing
+			}
+			else
+			{
+				throw new HUException("Unknown HU_UnitType=" + huUnitTypeCode + " for " + hu);
+			}
+
+			final HUEditorRow huEditorRowBuilt1 = huEditorRow1.build();
+
+		return huEditorRowBuilt1;
 	}
 
 	private static final String extractPackingInfo(final I_M_HU hu, final HUEditorRowType huUnitType)
@@ -393,7 +515,6 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 				.setHUStatus(hu.getHUStatus())
 				.setReservedForOrderLine(reservedForOrderLineId.orElse(null))
 				.setHUStatusDisplay(createHUStatusDisplayLookupValue(hu))
-				//
 				.setProduct(createProductLookupValue(productId))
 				.setUOM(createUOMLookupValue(huStorage.getC_UOM()))
 				.setQtyCU(huStorage.getQty().getAsBigDecimal())
