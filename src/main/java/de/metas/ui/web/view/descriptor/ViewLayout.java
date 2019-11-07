@@ -37,6 +37,7 @@ import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.descriptor.DetailId;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementDescriptor;
+import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor;
 import de.metas.ui.web.window.descriptor.factory.standard.LayoutFactory;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.util.Check;
@@ -97,6 +98,7 @@ public class ViewLayout implements ETagAware
 	private final ImmutableList<DocumentLayoutElementDescriptor> elements;
 
 	private final String idFieldName;
+	private final String focusOnFieldName;
 
 	private final boolean hasAttributesSupport;
 	private final IncludedViewLayout includedViewLayout;
@@ -115,6 +117,8 @@ public class ViewLayout implements ETagAware
 	/** If false, frontend shall not allow double clicking on a row in order to open it as a document */
 	private final boolean allowOpeningRowDetails;
 
+	private final boolean geoLocationSupport;
+
 	// ETag support
 	private static final AtomicInteger nextETagVersionSupplier = new AtomicInteger(1);
 	private final ETag eTag;
@@ -122,7 +126,7 @@ public class ViewLayout implements ETagAware
 	private ViewLayout(final Builder builder)
 	{
 		windowId = builder.windowId;
-		detailId = builder.getDetailId();
+		detailId = builder.detailId;
 		profileId = ViewProfileId.NULL;
 		caption = TranslatableStrings.nullToEmpty(builder.caption);
 		description = TranslatableStrings.nullToEmpty(builder.description);
@@ -136,6 +140,7 @@ public class ViewLayout implements ETagAware
 		defaultOrderBys = ImmutableList.copyOf(builder.getDefaultOrderBys());
 
 		idFieldName = builder.getIdFieldName();
+		focusOnFieldName = builder.focusOnFieldName;
 
 		hasAttributesSupport = builder.hasAttributesSupport;
 
@@ -151,6 +156,8 @@ public class ViewLayout implements ETagAware
 
 		allowOpeningRowDetails = builder.allowOpeningRowDetails;
 
+		geoLocationSupport = false;
+
 		eTag = ETag.of(nextETagVersionSupplier.getAndIncrement(), extractETagAttributes(filters, allowNewCaption));
 	}
 
@@ -163,7 +170,10 @@ public class ViewLayout implements ETagAware
 			final ImmutableList<DocumentFilterDescriptor> filters,
 			final ImmutableList<DocumentQueryOrderBy> defaultOrderBys,
 			final String allowNewCaption,
-			final boolean hasTreeSupport, final boolean treeCollapsible, final int treeExpandedDepth,
+			final boolean hasTreeSupport,
+			final boolean treeCollapsible,
+			final int treeExpandedDepth,
+			final boolean geoLocationSupport,
 			final ImmutableList<DocumentLayoutElementDescriptor> elements)
 	{
 		Check.assumeNotEmpty(elements, "elements is not empty");
@@ -182,6 +192,7 @@ public class ViewLayout implements ETagAware
 		this.defaultOrderBys = defaultOrderBys;
 
 		idFieldName = from.idFieldName;
+		focusOnFieldName = from.focusOnFieldName;
 
 		hasAttributesSupport = from.hasAttributesSupport;
 
@@ -196,6 +207,8 @@ public class ViewLayout implements ETagAware
 		this.allowNewCaption = allowNewCaption;
 
 		this.allowOpeningRowDetails = from.allowOpeningRowDetails;
+
+		this.geoLocationSupport = geoLocationSupport;
 
 		eTag = from.eTag.overridingAttributes(extractETagAttributes(filters, allowNewCaption));
 	}
@@ -286,6 +299,15 @@ public class ViewLayout implements ETagAware
 		return elements;
 	}
 
+	public Set<String> getFieldNames()
+	{
+		return getElements()
+				.stream()
+				.flatMap(element -> element.getFields().stream())
+				.map(DocumentLayoutElementFieldDescriptor::getField)
+				.collect(ImmutableSet.toImmutableSet());
+	}
+
 	public boolean hasElements()
 	{
 		return !elements.isEmpty();
@@ -337,6 +359,16 @@ public class ViewLayout implements ETagAware
 		return allowOpeningRowDetails;
 	}
 
+	public boolean isGeoLocationSupport()
+	{
+		return geoLocationSupport;
+	}
+
+	public String getFocusOnFieldName()
+	{
+		return focusOnFieldName;
+	}
+
 	@Override
 	public ETag getETag()
 	{
@@ -359,6 +391,7 @@ public class ViewLayout implements ETagAware
 		private Boolean hasTreeSupport;
 		private Boolean treeCollapsible;
 		private Integer treeExpandedDepth;
+		private Boolean geoLocationSupport;
 
 		private ArrayList<DocumentLayoutElementDescriptor> elements = null;
 		private ArrayList<DocumentQueryOrderBy> defaultOrderBys = null;
@@ -372,6 +405,7 @@ public class ViewLayout implements ETagAware
 			final boolean hasTreeSupportEffective = hasTreeSupport != null ? hasTreeSupport.booleanValue() : from.hasTreeSupport;
 			final boolean treeCollapsibleEffective = treeCollapsible != null ? treeCollapsible.booleanValue() : from.treeCollapsible;
 			final int treeExpandedDepthEffective = treeExpandedDepth != null ? treeExpandedDepth.intValue() : from.treeExpandedDepth;
+			final boolean geoLocationSupportEffective = geoLocationSupport != null ? geoLocationSupport.booleanValue() : from.geoLocationSupport;
 
 			final ImmutableList<DocumentLayoutElementDescriptor> elementsEffective = elements != null ? ImmutableList.copyOf(elements) : from.elements;
 			final ImmutableList<DocumentQueryOrderBy> defaultOrderBysEffective = defaultOrderBys != null ? ImmutableList.copyOf(defaultOrderBys) : from.defaultOrderBys;
@@ -385,7 +419,8 @@ public class ViewLayout implements ETagAware
 					&& from.treeCollapsible == treeCollapsibleEffective
 					&& from.treeExpandedDepth == treeExpandedDepthEffective
 					&& Objects.equals(from.elements, elementsEffective)
-					&& Objects.equals(from.defaultOrderBys, defaultOrderBysEffective))
+					&& Objects.equals(from.defaultOrderBys, defaultOrderBysEffective)
+					&& Objects.equals(from.geoLocationSupport, geoLocationSupportEffective))
 			{
 				return from;
 			}
@@ -396,7 +431,10 @@ public class ViewLayout implements ETagAware
 					filtersEffective,
 					defaultOrderBysEffective,
 					allowNewCaptionEffective,
-					hasTreeSupportEffective, treeCollapsibleEffective, treeExpandedDepthEffective,
+					hasTreeSupportEffective,
+					treeCollapsibleEffective,
+					treeExpandedDepthEffective,
+					geoLocationSupportEffective,
 					elementsEffective);
 		}
 
@@ -434,6 +472,12 @@ public class ViewLayout implements ETagAware
 			this.hasTreeSupport = hasTreeSupport;
 			this.treeCollapsible = treeCollapsible;
 			this.treeExpandedDepth = treeExpandedDepth;
+			return this;
+		}
+
+		public ChangeBuilder geoLocationSupport(final boolean geoLocationSupport)
+		{
+			this.geoLocationSupport = geoLocationSupport;
 			return this;
 		}
 
@@ -534,6 +578,7 @@ public class ViewLayout implements ETagAware
 		private final List<DocumentLayoutElementDescriptor.Builder> elementBuilders = new ArrayList<>();
 
 		private String idFieldName;
+		private String focusOnFieldName;
 
 		private Builder()
 		{
@@ -573,11 +618,6 @@ public class ViewLayout implements ETagAware
 		{
 			this.detailId = detailId;
 			return this;
-		}
-
-		public DetailId getDetailId()
-		{
-			return detailId;
 		}
 
 		public Builder setCaption(@Nullable final ITranslatableString caption)
@@ -801,5 +841,10 @@ public class ViewLayout implements ETagAware
 			return this;
 		}
 
+		public Builder setFocusOnFieldName(final String focusOnFieldName)
+		{
+			this.focusOnFieldName = focusOnFieldName;
+			return this;
+		}
 	}
 }

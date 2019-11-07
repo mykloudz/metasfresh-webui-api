@@ -53,6 +53,7 @@ import de.metas.ui.web.window.model.lookup.LookupDataSourceContext;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFetcher;
 import de.metas.ui.web.window.model.sql.DocActionValidationRule;
 import de.metas.util.Check;
+import lombok.ToString;
 
 /*
  * #%L
@@ -95,6 +96,16 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 				.setCtxTableName(null) // tableName
 				.setCtxColumnName(InterfaceWrapperHelper.getKeyColumnName(lookupTableName))
 				.setDisplayType(DisplayType.Search)
+				.setReadOnlyAccess()
+				.buildProvider();
+	}
+
+	public static LookupDescriptorProvider productAttributes()
+	{
+		return builder()
+				.setCtxTableName(null) // tableName
+				.setCtxColumnName(I_M_AttributeSetInstance.COLUMNNAME_M_AttributeSetInstance_ID)
+				.setDisplayType(DisplayType.PAttribute)
 				.setReadOnlyAccess()
 				.buildProvider();
 	}
@@ -324,6 +335,7 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 		return lookupSourceType;
 	}
 
+	@ToString(of = { "sqlTableName", "ctxTableName", "ctxColumnName", "widgetType" })
 	public static final class Builder
 	{
 		// Parameters

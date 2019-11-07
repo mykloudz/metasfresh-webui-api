@@ -48,6 +48,11 @@ public final class DocumentPath
 		return new Builder();
 	}
 
+	public static DocumentPath rootDocumentPath(@NonNull final AdWindowId adWindowId, final int documentIdInt)
+	{
+		return rootDocumentPath(WindowId.of(adWindowId), documentIdInt);
+	}
+
 	public static DocumentPath rootDocumentPath(@NonNull final WindowId windowId, final int documentIdInt)
 	{
 		final DocumentId documentId = DocumentId.of(documentIdInt);
@@ -398,6 +403,20 @@ public final class DocumentPath
 		}
 
 		return !rowIds.isEmpty();
+	}
+
+	public boolean isComposedKey()
+	{
+		if (detailId == null)
+		{
+			return documentId != null && documentId.isComposedKey();
+		}
+		else
+		{
+			return rowIds != null
+					&& rowIds.isSingleDocumentId()
+					&& rowIds.getSingleDocumentId().isComposedKey();
+		}
 	}
 
 	public DocumentPath createChildPath(final DetailId detailId, final DocumentId rowId)

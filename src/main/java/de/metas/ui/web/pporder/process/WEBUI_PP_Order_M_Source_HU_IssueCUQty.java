@@ -75,7 +75,7 @@ public class WEBUI_PP_Order_M_Source_HU_IssueCUQty
 	/**
 	 * Qty CU to be issued
 	 */
-	@Param(parameterName = PARAM_QtyCU, mandatory = true)
+	@Param(parameterName = PARAM_QtyCU, mandatory = false)
 	private BigDecimal qtyCU;
 
 	@Override
@@ -206,8 +206,8 @@ public class WEBUI_PP_Order_M_Source_HU_IssueCUQty
 
 			if (row.isProcessed())
 			{
-				final Quantity quantityToIssueForWhatWasReceived = ppOrderBomBL.calculateQtyToIssueBasedOnFinishedGoodReceipt(bomLine, row.getUom());
-				return qtyLeftToIssue.min(quantityToIssueForWhatWasReceived.getAsBigDecimal());
+				final Quantity quantityToIssueForWhatWasReceived = ppOrderBomBL.computeQtyToIssueBasedOnFinishedGoodReceipt(bomLine, row.getUom());
+				return qtyLeftToIssue.min(quantityToIssueForWhatWasReceived.toBigDecimal());
 			}
 			else
 			{
@@ -217,7 +217,7 @@ public class WEBUI_PP_Order_M_Source_HU_IssueCUQty
 		}
 		else
 		{
-			final BigDecimal sourceHuStorageQty = productStorages.get(0).getQty().getAsBigDecimal();
+			final BigDecimal sourceHuStorageQty = productStorages.get(0).getQty().toBigDecimal();
 
 			return sourceHuStorageQty;
 		}

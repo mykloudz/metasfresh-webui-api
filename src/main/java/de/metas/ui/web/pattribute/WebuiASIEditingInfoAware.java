@@ -1,18 +1,12 @@
-package de.metas.ui.web.view;
+package de.metas.ui.web.pattribute;
 
-import java.util.Comparator;
-
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.OrderUtils;
-
-import lombok.NonNull;
-import lombok.experimental.UtilityClass;
+import org.adempiere.mm.attributes.AttributeSetInstanceId;
 
 /*
  * #%L
  * metasfresh-webui-api
  * %%
- * Copyright (C) 2017 metas GmbH
+ * Copyright (C) 2019 metas GmbH
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as
@@ -30,18 +24,8 @@ import lombok.experimental.UtilityClass;
  * #L%
  */
 
-@UtilityClass
-/* package */class SqlViewCustomizerUtils
+@FunctionalInterface
+public interface WebuiASIEditingInfoAware
 {
-	public static final Comparator<SqlViewCustomizer> ORDERED_COMPARATOR = Comparator.comparing(SqlViewCustomizerUtils::getOrder);
-
-	private static final int getOrder(@NonNull final SqlViewCustomizer viewCustomizer)
-	{
-		if (viewCustomizer instanceof Ordered)
-		{
-			return ((Ordered)viewCustomizer).getOrder();
-		}
-
-		return OrderUtils.getOrder(viewCustomizer.getClass(), Ordered.LOWEST_PRECEDENCE);
-	}
+	WebuiASIEditingInfo getWebuiASIEditingInfo(AttributeSetInstanceId asiId);
 }

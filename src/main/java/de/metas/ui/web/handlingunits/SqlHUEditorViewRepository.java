@@ -277,7 +277,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 			huEditorRow
 					.setProduct(createProductLookupValue(singleProductStorage.getProductId()))
 					.setUOM(createUOMLookupValue(singleProductStorage.getC_UOM()))
-					.setQtyCU(singleProductStorage.getQty().getAsBigDecimal());
+					.setQtyCU(singleProductStorage.getQty().toBigDecimal());
 		}
 
 		//
@@ -517,7 +517,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 				.setHUStatusDisplay(createHUStatusDisplayLookupValue(hu))
 				.setProduct(createProductLookupValue(productId))
 				.setUOM(createUOMLookupValue(huStorage.getC_UOM()))
-				.setQtyCU(huStorage.getQty().getAsBigDecimal())
+				.setQtyCU(huStorage.getQty().toBigDecimal())
 				//
 				.build();
 
