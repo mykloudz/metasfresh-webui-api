@@ -12,7 +12,6 @@ import javax.annotation.Nullable;
 import org.adempiere.mm.attributes.AttributeSetInstanceId;
 import org.adempiere.mm.attributes.util.ASIEditingInfo;
 import org.adempiere.mm.attributes.util.ASIEditingInfo.WindowType;
-
 import com.google.common.collect.ImmutableMap;
 
 import de.metas.inoutcandidate.api.ShipmentScheduleId;
@@ -33,6 +32,7 @@ import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.ViewEditorRenderMode;
 import de.metas.ui.web.window.descriptor.WidgetSize;
+import de.metas.util.Check;
 import lombok.Builder;
 import lombok.NonNull;
 
@@ -69,43 +69,49 @@ public final class ShipmentCandidateRow implements IViewRow, WebuiASIEditingInfo
 	@ViewColumn(seqNo = 30, widgetType = DocumentFieldWidgetType.Lookup, widgetSize = WidgetSize.Small, captionKey = "M_Warehouse_ID")
 	private final LookupValue warehouse;
 
-	@ViewColumn(seqNo = 40, widgetType = DocumentFieldWidgetType.Lookup, widgetSize = WidgetSize.Small, captionKey = "M_Product_ID")
+	@ViewColumn(seqNo = 40, widgetType = DocumentFieldWidgetType.Lookup, widgetSize = WidgetSize.ExtraLarge, captionKey = "M_Product_ID")
 	private final LookupValue product;
 
-	@ViewColumn(seqNo = 50, widgetType = DocumentFieldWidgetType.ZonedDateTime, captionKey = "PreparationDate")
+	public static final String FIELD_asi = "asi";
+	@ViewColumn(seqNo = 50, widgetType = DocumentFieldWidgetType.ProductAttributes, fieldName = FIELD_asi, captionKey = "M_AttributeSetInstance_ID", editor = ViewEditorRenderMode.ALWAYS)
+	private final LookupValue asi;
+
+	@ViewColumn(seqNo = 60, widgetType = DocumentFieldWidgetType.Lookup, widgetSize = WidgetSize.Medium, captionKey = "PackDescription")
+	private final String packingDescription;
+
+	@ViewColumn(seqNo = 70, widgetType = DocumentFieldWidgetType.ZonedDateTime, widgetSize = WidgetSize.Small, captionKey = "PreparationDate")
 	private final ZonedDateTime preparationDate;
 
-	@ViewColumn(seqNo = 60, widgetType = DocumentFieldWidgetType.Quantity, captionKey =  "QtyOrdered")
+	@ViewColumn(seqNo = 80, widgetType = DocumentFieldWidgetType.Quantity, widgetSize = WidgetSize.Small, captionKey = "QtyOrdered")
 	private final BigDecimal qtyOrdered;
 
-	@ViewColumn(seqNo = 70, widgetType = DocumentFieldWidgetType.Lookup, widgetSize = WidgetSize.Small, captionKey = "C_UOM_ID")
+	@ViewColumn(seqNo = 90, widgetType = DocumentFieldWidgetType.Lookup, widgetSize = WidgetSize.Small, captionKey = "C_UOM_ID")
 	private final LookupValue uom;
 
 	public static final String FIELD_qtyToDeliverStockOverride = "qtyToDeliverStockOverride";
-	@ViewColumn(seqNo = 80, widgetType = DocumentFieldWidgetType.Quantity, fieldName = FIELD_qtyToDeliverStockOverride, captionKey = "QtyToDeliver_Override", editor = ViewEditorRenderMode.ALWAYS)
+	@ViewColumn(seqNo = 100, widgetType = DocumentFieldWidgetType.Quantity, fieldName = FIELD_qtyToDeliverStockOverride, widgetSize = WidgetSize.Small, captionKey = "QtyToDeliver_Override", editor = ViewEditorRenderMode.ALWAYS)
 	private final BigDecimal qtyToDeliverStockOverride;
 
 	public static final String FIELD_qtyToDeliverCatchOverride = "qtyToDeliverCatchOverride";
-	@ViewColumn(seqNo = 90, widgetType = DocumentFieldWidgetType.Quantity, fieldName = FIELD_qtyToDeliverCatchOverride, captionKey = "QtyToDeliverCatch_Override", editor = ViewEditorRenderMode.ALWAYS)
+	@ViewColumn(seqNo = 110, widgetType = DocumentFieldWidgetType.Quantity, fieldName = FIELD_qtyToDeliverCatchOverride, widgetSize = WidgetSize.Small, captionKey = "QtyToDeliverCatch_Override", editor = ViewEditorRenderMode.ALWAYS)
 	private final BigDecimal qtyToDeliverCatchOverride;
 
-	@ViewColumn(seqNo = 100, widgetType = DocumentFieldWidgetType.Lookup, widgetSize = WidgetSize.Small, captionKey = "Catch_UOM_ID")
+	@ViewColumn(seqNo = 120, widgetType = DocumentFieldWidgetType.Lookup, widgetSize = WidgetSize.Small, captionKey = "Catch_UOM_ID")
 	private final LookupValue catchUOM;
-
-	public static final String FIELD_asi = "asi";
-	@ViewColumn(seqNo = 110, widgetType = DocumentFieldWidgetType.ProductAttributes, fieldName = FIELD_asi, captionKey = "M_AttributeSetInstance_ID", editor = ViewEditorRenderMode.ALWAYS)
-	private final LookupValue asi;
 
 	private final ShipmentScheduleId shipmentScheduleId;
 	private final DocumentId rowId;
-	private final Quantity qtyToDeliverStockInitial;
-	private final BigDecimal qtyToDeliverCatchOverrideInitial;
-	private final AttributeSetInstanceId asiIdInitial;
+	private final int salesOrderLineNo;
 
 	private final ViewRowFieldNameAndJsonValuesHolder<ShipmentCandidateRow> values;
 	private final ImmutableMap<String, ViewEditorRenderMode> fieldNameAndJsonValues;
 
 	private boolean catchWeight;
+
+	// also store the editable value's initial values, so we know what was changed and can be persisted
+	private final Quantity qtyToDeliverStockInitial;
+	private final BigDecimal qtyToDeliverCatchOverrideInitial;
+	private final AttributeSetInstanceId asiIdInitial;
 
 	/**
 	 * If {@code catchUOM} is null, then the user is not supposed to enter a catch weight override quantity.
@@ -114,9 +120,11 @@ public final class ShipmentCandidateRow implements IViewRow, WebuiASIEditingInfo
 	private ShipmentCandidateRow(
 			@NonNull final ShipmentScheduleId shipmentScheduleId,
 			@Nullable final LookupValue salesOrder,
+			final int salesOrderLineNo,
 			@NonNull final LookupValue customer,
 			@NonNull final LookupValue warehouse,
 			@NonNull final LookupValue product,
+			@Nullable final String packingDescription,
 			@NonNull final ZonedDateTime preparationDate,
 			@NonNull final BigDecimal qtyOrdered,
 			@NonNull final LookupValue uom,
@@ -132,9 +140,11 @@ public final class ShipmentCandidateRow implements IViewRow, WebuiASIEditingInfo
 			@NonNull final LookupValue asi)
 	{
 		this.salesOrder = salesOrder;
+		this.salesOrderLineNo = salesOrderLineNo;
 		this.customer = customer;
 		this.warehouse = warehouse;
 		this.product = product;
+		this.packingDescription = !Check.isEmpty(packingDescription, true) ? packingDescription.trim() : null;
 		this.preparationDate = preparationDate;
 
 		this.qtyOrdered = qtyOrdered;
@@ -202,6 +212,15 @@ public final class ShipmentCandidateRow implements IViewRow, WebuiASIEditingInfo
 		return result.build();
 	}
 
+	public String getSalesOrderDisplayNameOrEmpty()
+	{
+		return salesOrder != null ? salesOrder.getDisplayName() : "";
+	}
+
+	public int getSalesOrderLineNo()
+	{
+		return salesOrderLineNo;
+	}
 
 	public ShipmentCandidateRow withChanges(@NonNull final ShipmentCandidateRowUserChangeRequest userChanges)
 	{
@@ -219,7 +238,6 @@ public final class ShipmentCandidateRow implements IViewRow, WebuiASIEditingInfo
 		{
 			builder.asi(userChanges.getAsi());
 		}
-
 		return builder.build();
 	}
 
@@ -273,24 +291,31 @@ public final class ShipmentCandidateRow implements IViewRow, WebuiASIEditingInfo
 
 	private boolean qtyToDeliverCatchOverrideIsChanged()
 	{
-		final boolean wasNull = qtyToDeliverCatchOverrideInitial == null;
-		final boolean isNull = qtyToDeliverCatchOverride == null;
+		final Optional<Boolean> nullValuechanged = isNullValuesChanged(qtyToDeliverCatchOverrideInitial, qtyToDeliverCatchOverride);
+		return nullValuechanged.orElseGet(() -> qtyToDeliverCatchOverrideInitial.compareTo(qtyToDeliverCatchOverride) != 0);
+	}
+
+	private Optional<Boolean> isNullValuesChanged(
+			@Nullable final Object initital,
+			@Nullable final Object current)
+	{
+		final boolean wasNull = initital == null;
+		final boolean isNull = current == null;
 
 		if (wasNull)
 		{
 			if (isNull)
 			{
-				return false;
+				return Optional.of(false);
 			}
-			return true; // was null and is not null anymore
+			return Optional.of(true); // was null and is not null anymore
 		}
 
 		if (isNull)
 		{
-			return true; // was not null and is now
+			return Optional.of(true); // was not null and is now
 		}
 
-		// was not null and still is not null
-		return qtyToDeliverCatchOverrideInitial.compareTo(qtyToDeliverCatchOverride) != 0;
+		return Optional.empty(); // was not null and still is not null; will need to compare the current values
 	}
 }

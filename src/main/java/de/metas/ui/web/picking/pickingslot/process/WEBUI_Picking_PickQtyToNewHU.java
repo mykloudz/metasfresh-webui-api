@@ -2,7 +2,6 @@ package de.metas.ui.web.picking.pickingslot.process;
 
 import static de.metas.ui.web.picking.PickingConstants.MSG_WEBUI_PICKING_MISSING_SOURCE_HU;
 import static de.metas.ui.web.picking.PickingConstants.MSG_WEBUI_PICKING_SELECT_PICKING_SLOT;
-import static org.adempiere.model.InterfaceWrapperHelper.loadOutOfTrx;
 
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -12,10 +11,7 @@ import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.warehouse.LocatorId;
 import org.adempiere.warehouse.WarehouseId;
 import org.adempiere.warehouse.api.IWarehouseBL;
-import org.compiere.model.I_C_BPartner;
 import org.compiere.model.I_C_UOM;
-import org.compiere.util.Env;
-import org.compiere.util.KeyNamePair;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import de.metas.handlingunits.HUPIItemProductId;
@@ -32,6 +28,8 @@ import de.metas.handlingunits.picking.PickingCandidateService;
 import de.metas.handlingunits.picking.requests.AddQtyToHURequest;
 import de.metas.handlingunits.report.HUReportService;
 import de.metas.handlingunits.report.HUToReportWrapper;
+import de.metas.i18n.ITranslatableString;
+import de.metas.inoutcandidate.api.IShipmentScheduleEffectiveBL;
 import de.metas.picking.api.PickingConfigRepository;
 import de.metas.picking.api.PickingSlotId;
 import de.metas.process.IProcessDefaultParameter;
@@ -194,7 +192,7 @@ public class WEBUI_Picking_PickQtyToNewHU
 		final ProductId productId = ProductId.ofRepoId(shipmentSchedule.getM_Product_ID());
 		return WEBUI_ProcessHelper.retrieveHUPIItemProducts(ctx,
 				productId,
-				loadOutOfTrx(shipmentSchedule.getC_BPartner_ID(), I_C_BPartner.class),
+				Services.get(IShipmentScheduleEffectiveBL.class).getBPartnerId(shipmentSchedule),
 				true); // includeVirtualItem = true..similar case as with production
 	}
 
@@ -216,10 +214,9 @@ public class WEBUI_Picking_PickQtyToNewHU
 			else
 			{
 				final IHUPIItemProductBL hupiItemProductBL = Services.get(IHUPIItemProductBL.class);
-				final String adLanguage = Env.getAD_Language();
 
-				final KeyNamePair keyNamePair = hupiItemProductBL.getDisplayName(piItemProductId, adLanguage);
-				return IntegerLookupValue.fromNamePair(keyNamePair, adLanguage);
+				final ITranslatableString displayName = hupiItemProductBL.getDisplayName(piItemProductId);
+				return IntegerLookupValue.of(piItemProductId, displayName);
 			}
 		}
 		else

@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 
-import de.metas.adempiere.report.jasper.OutputType;
 import de.metas.handlingunits.picking.PickingCandidate;
 import de.metas.handlingunits.picking.PickingCandidateService;
 import de.metas.handlingunits.picking.PickingCandidateStatus;
@@ -24,9 +23,10 @@ import de.metas.process.PInstanceRequest;
 import de.metas.process.ProcessInfo;
 import de.metas.process.ProcessInfoParameter;
 import de.metas.process.ProcessPreconditionsResolution;
-import de.metas.report.jasper.client.JRClient;
+import de.metas.report.client.ReportsClient;
+import de.metas.report.server.OutputType;
 import de.metas.ui.web.pickingV2.packageable.PackageableRow;
-import de.metas.ui.web.pickingV2.productsToPick.ProductsToPickRowsRepository;
+import de.metas.ui.web.pickingV2.productsToPick.rows.ProductsToPickRowsService;
 import de.metas.util.Services;
 import lombok.NonNull;
 
@@ -57,7 +57,7 @@ public class PackageablesView_PrintPicklist extends PackageablesViewBasedProcess
 	final private static AdProcessId PickListPdf_AD_Process_ID = AdProcessId.ofRepoId(541202);
 
 	@Autowired
-	private ProductsToPickRowsRepository productsToPickRowsRepository;
+	private ProductsToPickRowsService productsToPickRowsService;
 
 	@Autowired
 	private PickingCandidateService pickingCandidateService;
@@ -140,7 +140,7 @@ public class PackageablesView_PrintPicklist extends PackageablesViewBasedProcess
 				@Override
 				public void run(final String localTrxName) throws Exception
 				{
-					productsToPickRowsRepository.createPickingCandidates(row);
+					productsToPickRowsService.createPickingCandidates(row);
 				}
 
 				// Throw an explicit error in order to make sure that the user sees that something went wrong
@@ -175,8 +175,8 @@ public class PackageablesView_PrintPicklist extends PackageablesViewBasedProcess
 				.setJRDesiredOutputType(OutputType.PDF)
 				.build();
 
-		final JRClient jrClient = JRClient.get();
-		return jrClient.report(jasperProcessInfo);
+		final ReportsClient reportsClient = ReportsClient.get();
+		return reportsClient.report(jasperProcessInfo);
 	}
 
 	private PInstanceRequest createPInstanceRequest(@NonNull final PackageableRow row)

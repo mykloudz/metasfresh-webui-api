@@ -19,10 +19,16 @@ import de.metas.handlingunits.picking.PickingCandidateId;
 import de.metas.handlingunits.picking.PickingCandidateService;
 import de.metas.handlingunits.shipmentschedule.api.HUShippingFacade;
 import de.metas.handlingunits.shipmentschedule.async.GenerateInOutFromHU.BillAssociatedInvoiceCandidates;
+import de.metas.process.IProcessDefaultParameter;
+import de.metas.process.IProcessDefaultParametersProvider;
+import de.metas.process.IProcessParametersCallout;
 import de.metas.process.Param;
 import de.metas.process.ProcessPreconditionsResolution;
+import de.metas.shipping.ShipperId;
+import de.metas.shipping.api.IShipperTransportationDAO;
+import de.metas.shipping.api.ShipperTransportationId;
 import de.metas.shipping.model.I_M_ShipperTransportation;
-import de.metas.ui.web.pickingV2.productsToPick.ProductsToPickRow;
+import de.metas.ui.web.pickingV2.productsToPick.rows.ProductsToPickRow;
 import de.metas.util.Services;
 
 /*
@@ -47,14 +53,16 @@ import de.metas.util.Services;
  * #L%
  */
 
-public class ProductsToPick_4EyesReview_ProcessAll extends ProductsToPickViewBasedProcess
+public class ProductsToPick_4EyesReview_ProcessAll extends ProductsToPickViewBasedProcess implements IProcessDefaultParametersProvider, IProcessParametersCallout
 {
 	private final IHandlingUnitsDAO handlingUnitsRepo = Services.get(IHandlingUnitsDAO.class);
+	private final IShipperTransportationDAO shipperTransportationRepo = Services.get(IShipperTransportationDAO.class);
+
 	@Autowired
 	private PickingCandidateService pickingCandidatesService;
 
 	@Param(parameterName = I_M_Shipper.COLUMNNAME_M_Shipper_ID, mandatory = true)
-	private int shipperId;
+	private int shipperRecordId;
 
 	@Param(parameterName = I_M_ShipperTransportation.COLUMNNAME_M_ShipperTransportation_ID, mandatory = true)
 	private int shipperTransportationId;
@@ -77,12 +85,52 @@ public class ProductsToPick_4EyesReview_ProcessAll extends ProductsToPickViewBas
 		{
 			return ProcessPreconditionsResolution.rejectWithInternalReason("no unprocessed rows");
 		}
-		if (!rows.stream().allMatch(this::isEligibleForProcessing))
+		if (!rows.stream().allMatch(ProductsToPickRow::isEligibleForProcessing))
 		{
 			return ProcessPreconditionsResolution.rejectWithInternalReason("not all rows eligible for processing");
 		}
 
 		return ProcessPreconditionsResolution.accept();
+	}
+
+	@Override
+	public Object getParameterDefaultValue(final IProcessDefaultParameter parameter)
+	{
+		final String parameterName = parameter.getColumnName();
+		if (I_M_Shipper.COLUMNNAME_M_Shipper_ID.equals(parameterName))
+		{
+			final List<ProductsToPickRow> rows = getRowsNotAlreadyProcessed();
+			return rows.stream()
+					.map(ProductsToPickRow::getShipperId)
+					.filter(Predicates.notNull())
+					.findFirst()
+					.map(ShipperId::getRepoId)
+					.orElse(-1);
+		}
+
+		if (I_M_ShipperTransportation.COLUMNNAME_M_ShipperTransportation_ID.equals(parameterName))
+		{
+			return getNextTransportationOrderId();
+		}
+
+		return IProcessDefaultParametersProvider.DEFAULT_VALUE_NOTAVAILABLE;
+	}
+
+	@Override
+	public void onParameterChanged(final String parameterName)
+	{
+		if (I_M_Shipper.COLUMNNAME_M_Shipper_ID.equals(parameterName))
+		{
+			shipperTransportationId = getNextTransportationOrderId();
+		}
+	}
+
+	private int getNextTransportationOrderId()
+	{
+		final ShipperId shipperId = ShipperId.ofRepoIdOrNull(shipperRecordId);
+		final ShipperTransportationId nextShipperTransportationForShipper = shipperTransportationRepo.retrieveNextOpenShipperTransportationIdOrNull(shipperId);
+
+		return nextShipperTransportationForShipper == null ? -1 : nextShipperTransportationForShipper.getRepoId();
 	}
 
 	@Override
@@ -103,7 +151,7 @@ public class ProductsToPick_4EyesReview_ProcessAll extends ProductsToPickViewBas
 	{
 		final ImmutableSet<PickingCandidateId> pickingCandidateIdsToProcess = getRowsNotAlreadyProcessed()
 				.stream()
-				.filter(this::isEligibleForProcessing)
+				.filter(ProductsToPickRow::isEligibleForProcessing)
 				.map(ProductsToPickRow::getPickingCandidateId)
 				.filter(Predicates.notNull())
 				.collect(ImmutableSet.toImmutableSet());
@@ -140,12 +188,4 @@ public class ProductsToPick_4EyesReview_ProcessAll extends ProductsToPickViewBas
 				.filter(row -> !row.isProcessed())
 				.collect(ImmutableList.toImmutableList());
 	}
-
-	private boolean isEligibleForProcessing(final ProductsToPickRow row)
-	{
-		return !row.isProcessed()
-				&& row.isApproved()
-				&& (row.getPickStatus().isPacked() || row.getPickStatus().isPickRejected());
-	}
-
 }

@@ -1,5 +1,6 @@
 package de.metas.ui.web.order.products_proposal.model;
 
+import java.time.ZonedDateTime;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -26,22 +27,30 @@ import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
 import de.metas.currency.ICurrencyDAO;
 import de.metas.handlingunits.HUPIItemProductId;
+import de.metas.handlingunits.IHUPIItemProductBL;
 import de.metas.handlingunits.model.I_M_ProductPrice;
+import de.metas.i18n.IMsgBL;
+import de.metas.i18n.ITranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.lang.SOTrx;
 import de.metas.money.CurrencyId;
-import de.metas.order.OrderId;
 import de.metas.pricing.PriceListVersionId;
 import de.metas.pricing.ProductPriceId;
 import de.metas.pricing.service.IPriceListDAO;
 import de.metas.product.ProductId;
 import de.metas.ui.web.order.products_proposal.campaign_price.CampaignPriceProvider;
 import de.metas.ui.web.order.products_proposal.campaign_price.CampaignPriceProviders;
+import de.metas.ui.web.order.products_proposal.service.Order;
+import de.metas.ui.web.view.ViewHeaderProperties;
+import de.metas.ui.web.view.ViewHeaderProperties.ViewHeaderPropertiesBuilder;
+import de.metas.ui.web.view.ViewHeaderProperty;
 import de.metas.ui.web.window.datatypes.DocumentIdIntSequence;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.model.lookup.LookupDataSource;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFactory;
 import de.metas.util.Check;
 import de.metas.util.Services;
+import de.metas.util.time.SystemTime;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Singular;
@@ -75,12 +84,14 @@ public final class ProductsProposalRowsLoader
 	private final IAttributeSetInstanceBL attributeSetInstanceBL = Services.get(IAttributeSetInstanceBL.class);
 	private final ICurrencyDAO currenciesRepo = Services.get(ICurrencyDAO.class);
 	private final BPartnerProductStatsService bpartnerProductStatsService;
+	private final IHUPIItemProductBL packingMaterialsService = Services.get(IHUPIItemProductBL.class);
+	private final IMsgBL msgBL = Services.get(IMsgBL.class);
 	private final CampaignPriceProvider campaignPriceProvider;
 	private final LookupDataSource productLookup;
 	private final DocumentIdIntSequence nextRowIdSequence = DocumentIdIntSequence.newInstance();
 
 	private final ImmutableSet<PriceListVersionId> priceListVersionIds;
-	private final OrderId orderId;
+	private final Order order;
 	private final BPartnerId bpartnerId;
 	private final SOTrx soTrx;
 	private final ImmutableSet<ProductId> productIdsToExclude;
@@ -93,7 +104,7 @@ public final class ProductsProposalRowsLoader
 			@Nullable final CampaignPriceProvider campaignPriceProvider,
 			//
 			@NonNull @Singular final ImmutableSet<PriceListVersionId> priceListVersionIds,
-			@Nullable final OrderId orderId,
+			@Nullable final Order order,
 			@NonNull final BPartnerId bpartnerId,
 			@NonNull final SOTrx soTrx,
 			@Nullable final Set<ProductId> productIdsToExclude)
@@ -106,7 +117,7 @@ public final class ProductsProposalRowsLoader
 
 		this.priceListVersionIds = priceListVersionIds;
 
-		this.orderId = orderId;
+		this.order = order;
 		this.bpartnerId = bpartnerId;
 		this.soTrx = soTrx;
 		this.productIdsToExclude = productIdsToExclude != null ? ImmutableSet.copyOf(productIdsToExclude) : ImmutableSet.of();
@@ -121,11 +132,24 @@ public final class ProductsProposalRowsLoader
 		final PriceListVersionId basePriceListVersionId;
 		if (singlePriceListVersionId != null)
 		{
-			basePriceListVersionId = priceListsRepo.getBasePriceListVersionIdForPricingCalculationOrNull(singlePriceListVersionId);
+			final ZonedDateTime datePromised = order == null? SystemTime.asZonedDateTime() : order.getDatePromised();
+
+			basePriceListVersionId = priceListsRepo.getBasePriceListVersionIdForPricingCalculationOrNull(singlePriceListVersionId, datePromised);
 		}
 		else
 		{
 			basePriceListVersionId = null;
+		}
+
+		//
+		final ViewHeaderPropertiesBuilder headerProperties = ViewHeaderProperties.builder();
+
+		if (order != null)
+		{
+			headerProperties.entry(ViewHeaderProperty.builder()
+					.caption(msgBL.translatable("C_BPartner_ID"))
+					.value(order.getBpartnerName())
+					.build());
 		}
 
 		return ProductsProposalRowsData.builder()
@@ -134,9 +158,10 @@ public final class ProductsProposalRowsLoader
 				//
 				.singlePriceListVersionId(singlePriceListVersionId)
 				.basePriceListVersionId(basePriceListVersionId)
-				.orderId(orderId)
+				.order(order)
 				.bpartnerId(bpartnerId)
 				.soTrx(soTrx)
+				.headerProperties(headerProperties.build())
 				//
 				.rows(rows)
 				//
@@ -147,7 +172,8 @@ public final class ProductsProposalRowsLoader
 	{
 		return priceListVersionIds.stream()
 				.flatMap(this::loadAndStreamRowsForPriceListVersionId)
-				.sorted(Comparator.comparing(ProductsProposalRow::getProductName))
+				.sorted(Comparator.comparing(ProductsProposalRow::getSeqNo)
+						.thenComparing(ProductsProposalRow::getProductName))
 				.collect(ImmutableList.toImmutableList());
 	}
 
@@ -168,16 +194,25 @@ public final class ProductsProposalRowsLoader
 			return null;
 		}
 
+		final HUPIItemProductId packingMaterialId = HUPIItemProductId.ofRepoIdOrNull(record.getM_HU_PI_Item_Product_ID());
+		final ITranslatableString packingDescription = packingMaterialId != null
+				? packingMaterialsService.getDisplayName(packingMaterialId)
+				: TranslatableStrings.empty();
+
 		return ProductsProposalRow.builder()
 				.id(nextRowIdSequence.nextDocumentId())
 				.product(product)
-				.packingMaterialId(HUPIItemProductId.ofRepoIdOrNull(record.getM_HU_PI_Item_Product_ID()))
+				.packingMaterialId(packingMaterialId)
+				.packingDescription(packingDescription)
 				.asiDescription(extractProductASIDescription(record))
 				.price(extractProductProposalPrice(record))
 				.qty(null)
 				.lastShipmentDays(null) // will be populated later
+				.seqNo(record.getSeqNo())
 				.productPriceId(ProductPriceId.ofRepoId(record.getM_ProductPrice_ID()))
-				.build();
+				.build()
+				//
+				.withExistingOrderLine(order);
 	}
 
 	private ProductASIDescription extractProductASIDescription(final I_M_ProductPrice record)

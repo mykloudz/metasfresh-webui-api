@@ -398,7 +398,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 				huEditorRow1
 						.setProduct(createProductLookupValue(singleProductStorage1.getProductId()))
 						.setUOM(createUOMLookupValue(singleProductStorage1.getC_UOM()))
-						.setQtyCU(singleProductStorage1.getQty().getAsBigDecimal());
+						.setQtyCU(singleProductStorage1.getQty().toBigDecimal());
 			}
 
 			//

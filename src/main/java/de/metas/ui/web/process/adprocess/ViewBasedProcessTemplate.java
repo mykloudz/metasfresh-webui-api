@@ -101,6 +101,11 @@ public abstract class ViewBasedProcessTemplate extends JavaProcess
 	{
 		SpringContextHolder.instance.autowire(this);
 	}
+	
+	protected final IViewsRepository getViewsRepo()
+	{
+		return viewsRepo;
+	}
 
 	/**
 	 * Please implement {@link #checkPreconditionsApplicable()} instead of this.
@@ -202,6 +207,11 @@ public abstract class ViewBasedProcessTemplate extends JavaProcess
 		}
 
 		return expectedViewClass.isAssignableFrom(view.getClass());
+	}
+
+	protected final void invalidateView(@NonNull final IView view)
+	{
+		viewsRepo.invalidateView(view);
 	}
 
 	protected final void invalidateView(@NonNull final ViewId viewId)

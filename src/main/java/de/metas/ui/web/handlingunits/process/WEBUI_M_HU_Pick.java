@@ -17,11 +17,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.handlingunits.HuId;
+<<<<<<< HEAD
 import de.metas.handlingunits.model.I_M_ShipmentSchedule;
 import de.metas.handlingunits.picking.PickingCandidate;
 import de.metas.handlingunits.picking.PickingCandidatePickStatus;
+=======
+import de.metas.handlingunits.picking.PickFrom;
+>>>>>>> upstream/release
 import de.metas.handlingunits.picking.PickingCandidateService;
-import de.metas.handlingunits.picking.requests.PickHURequest;
+import de.metas.handlingunits.picking.requests.PickRequest;
 import de.metas.inoutcandidate.api.ShipmentScheduleId;
 import de.metas.logging.LogManager;
 import de.metas.order.OrderLineId;
@@ -269,9 +273,9 @@ public class WEBUI_M_HU_Pick extends ViewBasedProcessTemplate implements IProces
 		final HuId huId = row.getHuId();
 		final PickingSlotId pickingSlotId = PickingSlotId.ofRepoId(pickingSlotIdInt);
 		final ShipmentScheduleId shipmentScheduleId = ShipmentScheduleId.ofRepoId(shipmentScheduleIdInt);
-		pickingCandidateService.pickHU(PickHURequest.builder()
+		pickingCandidateService.pickHU(PickRequest.builder()
 				.shipmentScheduleId(shipmentScheduleId)
-				.pickFromHuId(huId)
+				.pickFrom(PickFrom.ofHuId(huId))
 				.pickingSlotId(pickingSlotId)
 				.build());
 		// NOTE: we are not moving the HU to shipment schedule's locator.

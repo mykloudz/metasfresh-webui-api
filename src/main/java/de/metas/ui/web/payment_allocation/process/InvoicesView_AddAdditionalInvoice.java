@@ -1,10 +1,8 @@
-package de.metas.ui.web.pickingV2.productsToPick;
+package de.metas.ui.web.payment_allocation.process;
 
-import de.metas.i18n.ITranslatableString;
-import de.metas.product.ProductId;
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+import de.metas.invoice.InvoiceId;
+import de.metas.process.Param;
+import de.metas.ui.web.payment_allocation.InvoicesView;
 
 /*
  * #%L
@@ -28,17 +26,16 @@ import lombok.Value;
  * #L%
  */
 
-@Value
-@Builder
-class ProductInfo
+public class InvoicesView_AddAdditionalInvoice extends InvoicesViewBasedProcess
 {
-	@NonNull
-	ProductId productId;
-	@NonNull
-	String code;
-	@NonNull
-	ITranslatableString name;
+	@Param(parameterName = "C_Invoice_ID", mandatory = true)
+	private InvoiceId invoiceId;
 
-	String packageSize;
-	String packageSizeUOM;
+	@Override
+	protected String doIt()
+	{
+		final InvoicesView view = getView();
+		view.addInvoice(invoiceId);
+		return MSG_OK;
+	}
 }

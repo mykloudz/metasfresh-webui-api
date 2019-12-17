@@ -20,6 +20,7 @@ import org.compiere.model.I_M_AttributeSetInstance;
 import org.eevolution.api.BOMUse;
 import org.eevolution.api.IProductBOMBL;
 import org.eevolution.api.IProductBOMDAO;
+import org.eevolution.api.ProductBOMLineId;
 import org.eevolution.model.I_PP_Product_BOM;
 import org.eevolution.model.I_PP_Product_BOMLine;
 import org.slf4j.Logger;
@@ -194,8 +195,12 @@ public class OrderLineQuickInputProcessor implements IQuickInputProcessor
 		final List<I_PP_Product_BOMLine> bomLines = bomsRepo.retrieveLines(bom);
 		for (final I_PP_Product_BOMLine bomLine : bomLines)
 		{
+			final ProductBOMLineId bomLineId = ProductBOMLineId.ofRepoId(bomLine.getPP_Product_BOMLine_ID());
 			final ProductId bomLineProductId = ProductId.ofRepoId(bomLine.getM_Product_ID());
 			final BigDecimal bomLineQty = bomsService.computeQtyRequired(bomLine, bomProductId, initialCandidate.getQty());
+
+			final AttributeSetInstanceId bomLineAsiId = AttributeSetInstanceId.ofRepoIdOrNone(bomLine.getM_AttributeSetInstance_ID());
+			final ImmutableAttributeSet attributes = asiBL.getImmutableAttributeSetById(bomLineAsiId);
 
 			if (compensationGroupId == null)
 			{
@@ -207,8 +212,10 @@ public class OrderLineQuickInputProcessor implements IQuickInputProcessor
 
 			result.add(initialCandidate.toBuilder()
 					.productId(bomLineProductId)
+					.attributes(attributes)
 					.qty(bomLineQty)
 					.compensationGroupId(compensationGroupId)
+					.explodedFromBOMLineId(bomLineId)
 					.build());
 		}
 
@@ -231,6 +238,11 @@ public class OrderLineQuickInputProcessor implements IQuickInputProcessor
 		if (candidate.getCompensationGroupId() != null)
 		{
 			to.setC_Order_CompensationGroup_ID(candidate.getCompensationGroupId().getOrderCompensationGroupId());
+		}
+
+		if (candidate.getExplodedFromBOMLineId() != null)
+		{
+			to.setExplodedFrom_BOMLine_ID(candidate.getExplodedFromBOMLineId().getRepoId());
 		}
 	}
 
@@ -312,5 +324,8 @@ public class OrderLineQuickInputProcessor implements IQuickInputProcessor
 
 		@Nullable
 		GroupId compensationGroupId;
+
+		@Nullable
+		ProductBOMLineId explodedFromBOMLineId;
 	}
 }
